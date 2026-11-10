@@ -170,7 +170,7 @@ export async function scan24h({ searchLimit = 40, maxPages = 40, onProgress }: S
     at,
     since,
     checked: coins.length,
-    caught: rows.slice(0, 600),
+    caught: rows.slice(0, 1500),
     pads: padRows,
     stats: {
       checked: coins.length,
