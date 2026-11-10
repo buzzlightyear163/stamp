@@ -227,7 +227,7 @@ export function Caught({ state, onCheck }: { state: ScanState; onCheck: (ca: str
                         )}
                         <div className="fake-meta">
                           <span>
-                            <b className="mono">{f.rows.length}</b> coins today
+                            <b className="mono">{f.rows.length}</b> {f.rows.length === 1 ? 'coin' : 'coins'} today
                             {last && (
                               <span className="mute">
                                 {' '}
@@ -293,6 +293,8 @@ export function Caught({ state, onCheck }: { state: ScanState; onCheck: (ca: str
 
 export function Platforms({ state }: { state: ScanState }) {
   const scan = state.s === 'done' ? state.scan : null
+  const [all, setAll] = useState(false)
+  const shown = scan ? (all ? scan.pads : scan.pads.slice(0, 12)) : []
   const max = scan ? Math.max(1, ...scan.pads.map((p) => p.launches)) : 1
   const total = scan ? scan.pads.reduce((n, p) => n + p.launches, 0) : 0
   return (
@@ -312,7 +314,7 @@ export function Platforms({ state }: { state: ScanState }) {
       <Scanning state={state} />
       {scan && (
         <div className="pads-grid">
-          {scan.pads.map((p) => (
+          {shown.map((p) => (
             <a
               key={p.key}
               className={`pad-tile ${p.launches ? '' : 'idle'}`}
@@ -340,6 +342,11 @@ export function Platforms({ state }: { state: ScanState }) {
             </a>
           ))}
         </div>
+      )}
+      {scan && scan.pads.length > 12 && (
+        <button className="more feed-toggle" onClick={() => setAll(!all)}>
+          {all ? 'Fewer pads' : `All ${scan.pads.length} pads`}
+        </button>
       )}
     </section>
   )
