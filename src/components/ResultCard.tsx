@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { readPad, type CheckResult, type Verdict } from '../lib/check'
 import { diffMarks } from '../lib/domains'
-import { dayMonth, raydiumToken, short, solscan, span, stamp } from '../lib/format'
+import type { LaunchCoin } from '../lib/api'
+import { dayMonth, ordinal, raydiumToken, short, solscan, span, stamp } from '../lib/format'
 
 export const VERDICT_LABEL: Record<Verdict, string> = {
   STAMPED: 'Stamped',
@@ -10,6 +11,8 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
   UNKNOWN: 'Unknown pad',
 }
 export const verdictClass = (v: Verdict | string) => `v-${v.toLowerCase()}`
+
+type Tone = 'ok' | 'bad' | 'mute'
 
 function Copy({ text }: { text: string }) {
   const [done, setDone] = useState(false)
@@ -44,27 +47,17 @@ const Row = ({ k, children }: { k: string; children: ReactNode }) => (
   </div>
 )
 
-const Tag = ({ tone, children }: { tone: 'ok' | 'bad' | 'mute'; children: ReactNode }) => (
+const Tag = ({ tone, children }: { tone: Tone; children: ReactNode }) => (
   <span className={`tag t-${tone}`}>{children}</span>
 )
 
-function Diff({ fake, real, where }: { fake: string; real: string; where: string }) {
+export function DiffText({ fake, real }: { fake: string; real: string }) {
   const d = diffMarks(fake, real)
   return (
-    <div className="diff">
-      <div className="diff-line">
-        <span className="diff-k">this coin’s {where}</span>
-        <span className="diff-v bad">
-          {d.fake.map((m, i) => (m.on ? <mark key={i}>{m.c}</mark> : m.c))}
-        </span>
-      </div>
-      <div className="diff-line">
-        <span className="diff-k">the real one</span>
-        <span className="diff-v ok">
-          {d.real.map((m, i) => (m.on ? <mark key={i}>{m.c}</mark> : m.c))}
-        </span>
-      </div>
-    </div>
+    <>
+      <span className="diff-v bad">{d.fake.map((m, i) => (m.on ? <mark key={i}>{m.c}</mark> : m.c))}</span>
+      <span className="diff-v ok">{d.real.map((m, i) => (m.on ? <mark key={i}>{m.c}</mark> : m.c))}</span>
+    </>
   )
 }
 
@@ -77,11 +70,125 @@ function Avatar({ src, sym }: { src?: string; sym: string }) {
   )
 }
 
+/** The three things STAMP reads, each passing or failing on its own. */
+function Checks({ r }: { r: CheckResult }) {
+  const { pad } = r
+  const padCheck: [Tone, string, string] =
+    pad.kind === 'verified'
+      ? ['ok', pad.name, 'Own config']
+      : pad.kind === 'impostor'
+        ? ['bad', pad.name, `Not ${pad.pad.name}’s config`]
+        : pad.kind === 'unverified'
+          ? ['mute', pad.name, 'Config not on record']
+          : ['mute', pad.name || 'Unnamed pad', 'Not verified yet']
+
+  const siteFake = r.lookalikes.find((l) => l.where === 'website' || l.where === 'pad website' || l.where === 'pad logo')
+  const domainCheck: [Tone, string, string] = siteFake
+    ? ['bad', siteFake.fake, `Look-alike of ${siteFake.real}`]
+    : r.domainMatch === 'match'
+      ? ['ok', r.coinDomain!, 'Same as the pad']
+      : r.domainMatch === 'otherpad'
+        ? ['bad', r.coinDomain!, `Points to ${r.domainOtherPad?.name}`]
+        : r.domainMatch === 'own'
+          ? ['mute', r.coinDomain!, 'Coin’s own site']
+          : ['mute', '—', 'No website']
+
+  const n = r.sameTicker.length
+  const tickerCheck: [Tone, string, string] =
+    r.position === 1
+      ? ['ok', `1st of ${n}${r.capped ? '+' : ''}`, n > 1 ? `${n - 1} came after` : 'No other coins']
+      : ['bad', `${ordinal(r.position)} of ${n}${r.capped ? '+' : ''}`, `Original ${span(r.coin.createAt - r.original.createAt)} earlier`]
+
+  const items: [string, [Tone, string, string]][] = [
+    ['Pad', padCheck],
+    ['Domain', domainCheck],
+    [`$${r.coin.symbol.trim().toUpperCase()}`, tickerCheck],
+  ]
+  return (
+    <div className="checks">
+      {items.map(([k, [tone, v, note]]) => (
+        <div key={k} className={`chk c-${tone}`}>
+          <div className="chk-k">
+            <span className="chk-i" aria-hidden="true">
+              {tone === 'ok' ? '✓' : tone === 'bad' ? '✗' : '–'}
+            </span>
+            {k}
+          </div>
+          <div className="chk-v mono">{v}</div>
+          <div className="chk-n">{note}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Every coin with this ticker on a time axis: the original at the left, now at the right. */
+function Timeline({ coins, me, onCheck }: { coins: LaunchCoin[]; me: string; onCheck: (ca: string) => void }) {
+  const W = 420
+  const H = 92
+  const t0 = coins[0].createAt
+  const t1 = Math.max(Date.now(), coins[coins.length - 1].createAt + 1)
+  // Copies usually land in a burst long after the original. When they do,
+  // break the axis: the original sits alone on the left, the burst gets the room.
+  const t2 = coins[1]?.createAt ?? t0
+  const broken = coins.length > 2 && (t2 - t0) / (t1 - t0) > 0.25
+  const x = (t: number) =>
+    !broken
+      ? 14 + ((t - t0) / (t1 - t0)) * (W - 28)
+      : t < t2
+        ? 14
+        : 64 + ((t - t2) / Math.max(1, t1 - t2)) * (W - 78)
+  const cols = new Map<number, number>()
+  const dots = coins.map((c, i) => {
+    const cx = x(c.createAt)
+    const col = Math.round(cx / 9)
+    const stack = Math.min(cols.get(col) ?? 0, 6)
+    cols.set(col, stack + 1)
+    const ps = readPad(c.platformInfo)
+    const tone = c.mint === me ? 'me' : i === 0 ? 'ok' : ps.kind === 'impostor' ? 'bad' : 'n'
+    return { c, cx, cy: H - 26 - stack * 9, tone }
+  })
+  return (
+    <svg className="tl" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Launch time of every coin with this ticker">
+      {broken ? (
+        <>
+          <line x1="8" x2="24" y1={H - 18} y2={H - 18} className="tl-axis" />
+          <text x="40" y={H - 15} className="tl-t" textAnchor="middle">
+            ⋯ {span(t2 - t0)} ⋯
+          </text>
+          <line x1="58" x2={W - 14} y1={H - 18} y2={H - 18} className="tl-axis" />
+        </>
+      ) : (
+        <line x1="14" x2={W - 14} y1={H - 18} y2={H - 18} className="tl-axis" />
+      )}
+      {dots.map((d) => (
+        <circle
+          key={d.c.mint}
+          cx={d.cx}
+          cy={d.cy}
+          r={d.tone === 'me' ? 5 : 3.5}
+          className={`tl-d tl-${d.tone}`}
+          onClick={() => d.c.mint !== me && onCheck(d.c.mint)}
+        >
+          <title>
+            {short(d.c.mint)} · {d.c.platformInfo.name || 'unnamed pad'} · {dayMonth(d.c.createAt)}
+          </title>
+        </circle>
+      ))}
+      <text x="8" y={H - 4} className="tl-t">
+        first · {dayMonth(t0)}
+      </text>
+      <text x={W - 14} y={H - 4} className="tl-t" textAnchor="end">
+        now
+      </text>
+    </svg>
+  )
+}
+
 export function ResultCard({ r, onCheck }: { r: CheckResult; onCheck: (ca: string) => void }) {
-  const { coin, pad, platform } = r
+  const { coin, platform } = r
   const tick = `$${coin.symbol.trim().toUpperCase()}`
   const main = r.lookalikes.find((l) => l.where === 'website') ?? r.lookalikes[0]
-  const others = r.sameTicker.length - 1
   const list = useRef<HTMLOListElement>(null)
 
   // Bring this coin's row into view inside the ticker list (not the page).
@@ -91,56 +198,10 @@ export function ResultCard({ r, onCheck }: { r: CheckResult; onCheck: (ca: strin
     if (ol && me) ol.scrollTop = me.offsetTop - ol.offsetTop - ol.clientHeight / 2 + me.clientHeight / 2
   }, [coin.mint])
 
-  const padCell = (() => {
-    switch (pad.kind) {
-      case 'verified':
-        return (
-          <>
-            {pad.name} <Tag tone="ok">Verified</Tag>
-          </>
-        )
-      case 'impostor':
-        return (
-          <>
-            {pad.name || '—'} <Tag tone="bad">Not {pad.pad.name}’s config</Tag>
-          </>
-        )
-      case 'unverified':
-        return (
-          <>
-            {pad.name} <Tag tone="mute">Config not on record</Tag>
-          </>
-        )
-      default:
-        return (
-          <>
-            {pad.name || 'Unnamed pad'} <Tag tone="mute">New</Tag>
-          </>
-        )
-    }
-  })()
-
-  const domainCell = (() => {
-    switch (r.domainMatch) {
-      case 'match':
-        return <span className="ok">✓ same as the pad</span>
-      case 'lookalike':
-        return <span className="bad">✗ look-alike of {main?.real}</span>
-      case 'otherpad':
-        return <span className="bad">✗ points to {r.domainOtherPad?.name}, a different pad</span>
-      case 'own':
-        return <span className="mute">— coin links its own site</span>
-      default:
-        return <span className="mute">— no website</span>
-    }
-  })()
-
   return (
     <article className={`card ${verdictClass(r.verdict)}`} aria-live="polite">
       <header className="card-head">
-        <div className="verdict">
-          <span className="verdict-box">{VERDICT_LABEL[r.verdict]}</span>
-        </div>
+        <span className="verdict-box">{VERDICT_LABEL[r.verdict]}</span>
         <div className="coin">
           <Avatar src={coin.imgUrl} sym={coin.symbol} />
           <div className="coin-id">
@@ -158,21 +219,36 @@ export function ResultCard({ r, onCheck }: { r: CheckResult; onCheck: (ca: strin
       </header>
 
       <p className="headline">{r.headline}</p>
+      <Checks r={r} />
 
-      {main && <Diff fake={main.fake} real={main.real} where={main.where} />}
+      {main && (
+        <div className="diff">
+          <span className="diff-k">this coin’s {main.where}</span>
+          <span className="diff-k">the real one</span>
+          <DiffText fake={main.fake} real={main.real} />
+        </div>
+      )}
 
       <div className="card-body">
         <dl className="rows">
-          <Row k="Platform">{padCell}</Row>
+          <Row k="Platform">
+            {platform.name || 'Unnamed pad'}{' '}
+            {r.pad.kind === 'verified' ? (
+              <Tag tone="ok">Verified</Tag>
+            ) : r.pad.kind === 'impostor' ? (
+              <Tag tone="bad">Not {r.pad.pad.name}’s</Tag>
+            ) : (
+              <Tag tone="mute">Unverified</Tag>
+            )}
+          </Row>
           <Row k="Platform address">
             <Addr a={platform.pubKey} />
           </Row>
           <Row k="Registered domain">{r.regDomain ?? <span className="mute">— none set</span>}</Row>
           <Row k="Coin’s domain">{r.coinDomain ?? <span className="mute">—</span>}</Row>
-          <Row k="Domain match">{domainCell}</Row>
           <Row k={`First ${tick}`}>
             {r.position === 1 ? (
-              <span className="ok">✓ this coin · {stamp(coin.createAt)}</span>
+              <span className="ok">this coin · {stamp(coin.createAt)}</span>
             ) : (
               <span className="addr">
                 <button className="linkish" onClick={() => onCheck(r.original.mint)}>
@@ -182,16 +258,6 @@ export function ResultCard({ r, onCheck }: { r: CheckResult; onCheck: (ca: strin
                   {r.original.platformInfo.name || 'unnamed pad'} · {stamp(r.original.createAt)}
                 </span>
               </span>
-            )}
-          </Row>
-          <Row k={`Other ${tick} coins`}>
-            {others > 0 ? (
-              <span className={r.position === 1 ? '' : 'bad'}>
-                {others}
-                {r.capped ? '+' : ''} {r.position === 1 ? 'came after this one' : 'on LaunchLab'}
-              </span>
-            ) : (
-              <span className="ok">none</span>
             )}
           </Row>
           <Row k="Creator wallet">
@@ -204,7 +270,11 @@ export function ResultCard({ r, onCheck }: { r: CheckResult; onCheck: (ca: strin
               <span>
                 No{' '}
                 <span className="mute">
-                  · {coin.finishingRate > 0 && coin.finishingRate < 1 ? coin.finishingRate.toFixed(2) : Math.round(coin.finishingRate)}% of curve
+                  ·{' '}
+                  {coin.finishingRate > 0 && coin.finishingRate < 1
+                    ? coin.finishingRate.toFixed(2)
+                    : Math.round(coin.finishingRate)}
+                  % of curve
                 </span>
               </span>
             )}
@@ -222,27 +292,24 @@ export function ResultCard({ r, onCheck }: { r: CheckResult; onCheck: (ca: strin
 
         <aside className="ticker">
           <div className="ticker-head">
-            <span>
-              {tick} on LaunchLab
-            </span>
+            <span>{tick} on LaunchLab</span>
             <span className="mono mute">
               {r.sameTicker.length}
               {r.capped ? '+' : ''}
             </span>
           </div>
+          <Timeline coins={r.sameTicker} me={coin.mint} onCheck={onCheck} />
           <ol className="ticker-list" ref={list}>
             {r.sameTicker.map((c, i) => {
               const me = c.mint === coin.mint
               const ps = readPad(c.platformInfo)
               const padTone = ps.kind === 'impostor' ? 'bad' : ps.kind === 'verified' ? '' : 'mute'
-              const padTitle =
-                ps.kind === 'impostor' ? `Not ${ps.pad.name}’s config` : ps.kind === 'verified' ? 'Verified pad' : 'Not verified'
               return (
                 <li key={c.mint} className={me ? 'me' : ''}>
                   <button onClick={() => !me && onCheck(c.mint)} disabled={me}>
                     <span className="n mono">{i + 1}</span>
                     <span className="m mono">{short(c.mint, 4)}</span>
-                    <span className={`p ${padTone}`} title={padTitle}>
+                    <span className={`p ${padTone}`}>
                       {c.platformInfo.name || '—'}
                       {ps.kind === 'impostor' && ' ✗'}
                     </span>

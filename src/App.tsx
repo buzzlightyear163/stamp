@@ -109,10 +109,10 @@ export default function App() {
             {state.s === 'error' && <p className="status err">{state.msg}</p>}
             {state.s === 'done' && <ResultCard r={state.r} onCheck={go} />}
           </div>
+          <Stats state={scan} />
         </section>
         <Caught state={scan} onCheck={checkFromList} />
         <Platforms state={scan} />
-        <Stats state={scan} />
       </main>
       <Footer />
     </>

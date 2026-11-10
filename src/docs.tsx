@@ -9,6 +9,7 @@ import './index.css'
 import { TopBar } from './components/TopBar'
 import { Footer } from './components/Footer'
 import { PADS } from './lib/pads'
+import { DiffText } from './components/ResultCard'
 
 const VERDICTS = [
   ['STAMPED', 'v-stamped', 'The first coin with its ticker on LaunchLab, launched through a pad config we’ve tied to that pad.'],
@@ -63,18 +64,9 @@ function Docs() {
           on another ending. The same test runs on X handles.
         </p>
         <div className="diff docs-diff">
-          <div className="diff-line">
-            <span className="diff-k">caught on 9 Nov</span>
-            <span className="diff-v bad">
-              f<mark>i</mark>oatlaunch.xyz
-            </span>
-          </div>
-          <div className="diff-line">
-            <span className="diff-k">the real one</span>
-            <span className="diff-v ok">
-              f<mark>l</mark>oatlaunch.xyz
-            </span>
-          </div>
+          <span className="diff-k">caught on 9 Nov</span>
+          <span className="diff-k">the real one</span>
+          <DiffText fake="fioatlaunch.xyz" real="floatlaunch.xyz" />
         </div>
 
         <h2 id="pads">Pads on record</h2>
