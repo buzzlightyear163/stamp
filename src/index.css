@@ -136,6 +136,42 @@ button {
   background: #b8e2ff;
 }
 
+/* ---------- CA chip ---------- */
+
+.ca-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.ca-chip:hover {
+  border-color: #24406b;
+}
+.ca-k,
+.ca-c {
+  color: var(--mute);
+}
+.ca-c {
+  font-size: 11px;
+  border-left: 1px solid var(--line);
+  padding-left: 8px;
+}
+.ca-chip.full {
+  margin-top: 16px;
+  max-width: 100%;
+}
+.ca-chip.full .ca-v {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------- check ---------- */
 
 .check {
@@ -1273,6 +1309,9 @@ button {
   .live {
     display: none;
   }
+  .top .ca-chip .ca-c {
+    display: none;
+  }
   .card-body {
     grid-template-columns: 1fr;
   }
@@ -1298,6 +1337,12 @@ button {
   }
   .nav {
     display: none;
+  }
+  .top .ca-chip .ca-k {
+    display: none;
+  }
+  .top .btn {
+    padding: 8px 12px;
   }
   .check {
     padding-top: 44px;

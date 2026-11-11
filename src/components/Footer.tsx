@@ -1,4 +1,4 @@
-import { Mark } from './TopBar'
+import { CaChip, Mark } from './TopBar'
 import { STAMP, buyUrl } from '../config'
 
 export function Footer() {
@@ -12,6 +12,7 @@ export function Footer() {
               <span>STAMP</span>
             </a>
             <p>Check the stamp before you ape.</p>
+            <CaChip full />
           </div>
           <nav>
             <h3>Product</h3>

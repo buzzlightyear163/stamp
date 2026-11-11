@@ -1,6 +1,6 @@
 /** Fill these in at launch. */
 export const STAMP = {
-  ca: '',
+  ca: 'FyHoVLRdnRawp5kPckJTMRwPqjCmSXx7px39R5yRw5Ac',
   x: 'https://x.com/',
 }
 

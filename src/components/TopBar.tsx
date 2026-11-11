@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { newestCoins } from '../lib/api'
 import { span } from '../lib/format'
-import { buyUrl } from '../config'
+import { STAMP, buyUrl } from '../config'
+import { short } from '../lib/format'
 
 export function Mark({ size = 20 }: { size?: number }) {
   // A postage stamp: perforated edge around a solid face.
@@ -39,6 +40,27 @@ function LastCoin() {
   )
 }
 
+/** The $STAMP CA, copied whole on click. */
+export function CaChip({ full = false }: { full?: boolean }) {
+  const [done, setDone] = useState(false)
+  if (!STAMP.ca) return null
+  return (
+    <button
+      className={`ca-chip mono ${full ? 'full' : ''}`}
+      title={`$STAMP CA: ${STAMP.ca}`}
+      onClick={() => {
+        navigator.clipboard?.writeText(STAMP.ca)
+        setDone(true)
+        setTimeout(() => setDone(false), 1400)
+      }}
+    >
+      <span className="ca-k">CA</span>
+      <span className="ca-v">{full ? STAMP.ca : short(STAMP.ca, 4)}</span>
+      <span className="ca-c">{done ? 'copied' : 'copy'}</span>
+    </button>
+  )
+}
+
 export function TopBar({ active = 'check' }: { active?: 'check' | 'docs' }) {
   return (
     <header className="top">
@@ -59,6 +81,7 @@ export function TopBar({ active = 'check' }: { active?: 'check' | 'docs' }) {
         </nav>
         <div className="top-right">
           <LastCoin />
+          <CaChip />
           <a className="btn" href={buyUrl()} target="_blank" rel="noreferrer">
             Buy $STAMP
           </a>
