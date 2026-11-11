@@ -11,6 +11,8 @@ export interface Pad {
   img?: string
   x?: string
   configs: string[]
+  /** False for pads with a default name others use too: never treat that name as impersonation. */
+  matchName?: boolean
 }
 
 export const PADS: Pad[] = [
@@ -122,6 +124,14 @@ export const PADS: Pad[] = [
       '8DDZ3N8hcdhjwShJZb78D8rKWKSgEnMCTx6EgW6VeQzz',
     ],
   },
+  {
+    // STAMP's own pad. Its on-chain name is LaunchLab's default, so the name alone proves nothing.
+    id: 'stamp',
+    name: 'My Launch Platform',
+    domain: '',
+    configs: ['D2ySdMncomHKRKBV4AAftqnLKxyS6HMWcmbewvNcawCg'],
+    matchName: false,
+  },
   { id: 'peak', name: 'Peak', domain: 'launchonpeak.fun', configs: [] },
   { id: 'curvd', name: 'Curvd', domain: 'curvd.fun', configs: [] },
   { id: 'stoke', name: 'Stoke', domain: 'usestoke.xyz', configs: [] },
@@ -131,6 +141,6 @@ export const padByConfig = (pubKey: string) => PADS.find((p) => p.configs.includ
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 export const padByName = (name: string) =>
-  name.trim() ? PADS.find((p) => norm(p.name) === norm(name)) : undefined
+  name.trim() ? PADS.find((p) => p.matchName !== false && norm(p.name) === norm(name)) : undefined
 export const padByDomain = (domain: string | null) =>
-  domain ? PADS.find((p) => p.domain === domain) : undefined
+  domain ? PADS.find((p) => p.domain && p.domain === domain) : undefined

@@ -1,5 +1,5 @@
 import { newestPage, raydiumListedPlatforms, searchTicker, type LaunchCoin, type PlatformInfo } from './api.js'
-import { findLookalikes, readPad } from './check.js'
+import { findLookalikes, readPad, runOf } from './check.js'
 import { baseDomain, hostOf } from './domains.js'
 import { PADS } from './pads.js'
 
@@ -105,18 +105,19 @@ export async function scan24h({ searchLimit = 40, maxPages = 40, onProgress }: S
     groups.set(s, [...(groups.get(s) ?? []), c])
   }
   const repeated = [...groups.entries()].filter(([, g]) => g.length > 1).sort((a, b) => b[1].length - a[1].length)
-  const firstSeen = new Map<string, LaunchCoin>()
+  const history = new Map<string, LaunchCoin[]>()
   await inBatches(repeated.slice(0, searchLimit), 8, async ([s]) => {
     const hits = await searchTicker(s).catch(() => [] as LaunchCoin[])
-    const exact = hits.filter((h) => sym(h.symbol) === s).sort((a, b) => a.createAt - b.createAt)
-    if (exact[0]) firstSeen.set(s, exact[0])
+    history.set(s, hits.filter((h) => sym(h.symbol) === s))
   })
   for (const [s, g] of repeated) {
-    g.sort((a, b) => a.createAt - b.createAt)
-    const known = firstSeen.get(s)
-    const original = known && known.createAt <= g[0].createAt ? known : g[0]
+    const all = new Map<string, LaunchCoin>()
+    for (const c of [...(history.get(s) ?? []), ...g]) all.set(c.mint, c)
+    const sorted = [...all.values()].sort((a, b) => a.createAt - b.createAt)
     for (const c of g) {
-      if (c.mint === original.mint || caught.has(c.mint)) continue
+      // A copy only if the ticker was used in the 30 days before it (see runOf).
+      const { original, position } = runOf(sorted, c.mint)
+      if (position === 1 || caught.has(c.mint)) continue
       caught.set(c.mint, {
         mint: c.mint,
         symbol: c.symbol,
@@ -142,7 +143,7 @@ export async function scan24h({ searchLimit = 40, maxPages = 40, onProgress }: S
     let row: Omit<PadRow, 'launches'>
     if (ps.kind === 'verified') {
       key = ps.pad?.id ?? `listed:${ps.name.toLowerCase()}`
-      row = { key, name: ps.name, domain: ps.domain, img: ps.pad?.img || p.img, status: 'verified' }
+      row = { key, name: ps.name, domain: ps.domain || null, img: ps.pad?.img || p.img, status: 'verified' }
     } else if (ps.kind === 'unverified') {
       continue // claims a known pad's domain through a config we haven't tied to it
     } else {
@@ -156,7 +157,7 @@ export async function scan24h({ searchLimit = 40, maxPages = 40, onProgress }: S
   }
   for (const pad of PADS) {
     if (!pads.has(pad.id))
-      pads.set(pad.id, { key: pad.id, name: pad.name, domain: pad.domain, img: pad.img ?? '', launches: 0, status: 'verified' })
+      pads.set(pad.id, { key: pad.id, name: pad.name, domain: pad.domain || null, img: pad.img ?? '', launches: 0, status: 'verified' })
   }
   const padRows = [...pads.values()]
     .filter((p) => p.status === 'verified' || p.launches >= 2)

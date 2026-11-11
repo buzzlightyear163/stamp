@@ -41,12 +41,37 @@ export interface CheckResult {
   lookalikes: Lookalike[]
   sameTicker: LaunchCoin[]
   original: LaunchCoin
+  /** Place in its run (1 = the original). */
   position: number
+  runLength: number
+  /** Same-ticker coins from before this run, more than 30 days before it. */
+  older: LaunchCoin[]
   capped: boolean
   graduated: boolean
 }
 
 export class CheckError extends Error {}
+
+/** A ticker that went unused for this long is free again: the next coin to use it starts a new run. */
+export const COPY_WINDOW = 30 * 24 * 3600 * 1000
+
+/**
+ * Same-ticker coins, oldest first, split into runs. A new run starts when the
+ * ticker sat unused for longer than COPY_WINDOW. Coins in a run after its first
+ * one are copies of it; an unrelated coin from a year ago doesn't make yours one.
+ */
+export function runOf(sorted: LaunchCoin[], mint: string) {
+  let start = 0
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i].createAt - sorted[i - 1].createAt > COPY_WINDOW) start = i
+    if (sorted[i].mint === mint) {
+      let end = i + 1
+      while (end < sorted.length && sorted[end].createAt - sorted[end - 1].createAt <= COPY_WINDOW) end++
+      return { original: sorted[start], position: i - start + 1, older: sorted.slice(0, start), run: sorted.slice(start, end) }
+    }
+  }
+  return { original: sorted[0], position: 1, older: [] as LaunchCoin[], run: sorted }
+}
 
 let listedCache: Promise<PlatformInfo[]> | null = null
 const listed = () => {
@@ -86,7 +111,7 @@ export function findLookalikes(coin: LaunchCoin): Lookalike[] {
     const base = baseDomain(host)
     if (!base) continue
     for (const pad of PADS) {
-      if (isLookalikeDomain(base, pad.domain) && !out.some((o) => o.fake === base)) {
+      if (pad.domain && isLookalikeDomain(base, pad.domain) && !out.some((o) => o.fake === base)) {
         out.push({ where, fake: base, real: pad.domain, pad, trick: describeTrick(base, pad.domain) })
       }
     }
@@ -112,8 +137,7 @@ export async function check(ca: string, onStep?: (s: string) => void): Promise<C
   const same = rows.filter((r) => sym(r.symbol) === sym(coin.symbol))
   if (!same.some((r) => r.mint === coin.mint)) same.push(coin)
   same.sort((a, b) => a.createAt - b.createAt)
-  const original = same[0]
-  const position = same.findIndex((r) => r.mint === coin.mint) + 1
+  const { original, position, older, run } = runOf(same, coin.mint)
 
   onStep?.('Comparing pad and domains')
   const platform = coin.platformInfo
@@ -150,13 +174,16 @@ export async function check(ca: string, onStep?: (s: string) => void): Promise<C
     }.`
   } else if (pad.kind !== 'verified') {
     verdict = 'UNKNOWN'
+    const first = older.length ? `First ${tick} in 30 days` : `First ${tick}`
     headline =
       pad.kind === 'unverified'
-        ? `First ${tick}, but the config claiming ${pad.pad.domain} isn’t one we’ve tied to ${pad.pad.name}.`
-        : `First ${tick}, launched through a pad we haven’t verified yet.`
+        ? `${first}, but the config claiming ${pad.pad.domain} isn’t one we’ve tied to ${pad.pad.name}.`
+        : `${first}, launched through a pad we haven’t verified yet.`
   } else {
     verdict = 'STAMPED'
-    headline = `The first ${tick} on LaunchLab, launched through ${pad.name}’s own config.`
+    headline = older.length
+      ? `The first ${tick} on LaunchLab in 30 days, launched through ${pad.name}’s own config.`
+      : `The first ${tick} on LaunchLab, launched through ${pad.name}’s own config.`
   }
 
   return {
@@ -173,6 +200,8 @@ export async function check(ca: string, onStep?: (s: string) => void): Promise<C
     sameTicker: same,
     original,
     position,
+    runLength: run.length,
+    older,
     capped: rows.length >= 100,
     graduated: coin.finishingRate >= 100 || !!coin.migrateAmmId,
   }

@@ -609,7 +609,10 @@ button {
 .ticker-list .f {
   text-align: right;
 }
-.ticker-list li:first-child .f {
+.ticker-list li.old button {
+  color: var(--mute);
+}
+.ticker-list li.orig .f {
   color: var(--ok);
 }
 .ticker-list li.me button {
@@ -896,6 +899,9 @@ button {
 }
 .tl-ok {
   fill: var(--ok);
+}
+.tl-old {
+  fill: #1f3352;
 }
 .tl-bad {
   fill: var(--bad);

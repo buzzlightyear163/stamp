@@ -329,7 +329,7 @@ export function Platforms({ state }: { state: ScanState }) {
                   {p.status === 'verified' ? 'Verified' : 'New'}
                 </span>
               </div>
-              <div className="pad-dom mono">{p.domain ?? '—'}</div>
+              <div className="pad-dom mono">{p.domain || 'no website'}</div>
               <div className="pad-n">
                 <span className="mono">{p.launches.toLocaleString('en-US')}</span>
                 <span className="mute">

@@ -93,10 +93,13 @@ function Checks({ r }: { r: CheckResult }) {
           ? ['mute', r.coinDomain!, 'Coin’s own site']
           : ['mute', '—', 'No website']
 
-  const n = r.sameTicker.length
+  const n = r.runLength
+  const last = r.older[r.older.length - 1]
   const tickerCheck: [Tone, string, string] =
     r.position === 1
-      ? ['ok', `1st of ${n}${r.capped ? '+' : ''}`, n > 1 ? `${n - 1} came after` : 'No other coins']
+      ? last
+        ? ['ok', 'First in 30 days', `Last used ${span(r.coin.createAt - last.createAt)} earlier`]
+        : ['ok', `1st of ${n}${r.capped ? '+' : ''}`, n > 1 ? `${n - 1} came after` : 'No other coins']
       : ['bad', `${ordinal(r.position)} of ${n}${r.capped ? '+' : ''}`, `Original ${span(r.coin.createAt - r.original.createAt)} earlier`]
 
   const items: [string, [Tone, string, string]][] = [
@@ -123,7 +126,7 @@ function Checks({ r }: { r: CheckResult }) {
 }
 
 /** Every coin with this ticker on a time axis: the original at the left, now at the right. */
-function Timeline({ coins, me, onCheck }: { coins: LaunchCoin[]; me: string; onCheck: (ca: string) => void }) {
+function Timeline({ coins, me, original, onCheck }: { coins: LaunchCoin[]; me: string; original: LaunchCoin; onCheck: (ca: string) => void }) {
   const W = 420
   const H = 92
   const t0 = coins[0].createAt
@@ -139,13 +142,14 @@ function Timeline({ coins, me, onCheck }: { coins: LaunchCoin[]; me: string; onC
         ? 14
         : 64 + ((t - t2) / Math.max(1, t1 - t2)) * (W - 78)
   const cols = new Map<number, number>()
-  const dots = coins.map((c, i) => {
+  const dots = coins.map((c) => {
     const cx = x(c.createAt)
     const col = Math.round(cx / 9)
     const stack = Math.min(cols.get(col) ?? 0, 6)
     cols.set(col, stack + 1)
     const ps = readPad(c.platformInfo)
-    const tone = c.mint === me ? 'me' : i === 0 ? 'ok' : ps.kind === 'impostor' ? 'bad' : 'n'
+    const tone =
+      c.mint === me ? 'me' : c.mint === original.mint ? 'ok' : c.createAt < original.createAt ? 'old' : ps.kind === 'impostor' ? 'bad' : 'n'
     return { c, cx, cy: H - 26 - stack * 9, tone }
   })
   return (
@@ -248,7 +252,10 @@ export function ResultCard({ r, onCheck }: { r: CheckResult; onCheck: (ca: strin
           <Row k="Coin’s domain">{r.coinDomain ?? <span className="mute">—</span>}</Row>
           <Row k={`First ${tick}`}>
             {r.position === 1 ? (
-              <span className="ok">this coin · {stamp(coin.createAt)}</span>
+              <span className="ok">
+                this coin · {stamp(coin.createAt)}
+                {r.older.length > 0 && <span className="mute"> · older ones are 30+ days earlier</span>}
+              </span>
             ) : (
               <span className="addr">
                 <button className="linkish" onClick={() => onCheck(r.original.mint)}>
@@ -298,14 +305,14 @@ export function ResultCard({ r, onCheck }: { r: CheckResult; onCheck: (ca: strin
               {r.capped ? '+' : ''}
             </span>
           </div>
-          <Timeline coins={r.sameTicker} me={coin.mint} onCheck={onCheck} />
+          <Timeline coins={r.sameTicker} me={coin.mint} original={r.original} onCheck={onCheck} />
           <ol className="ticker-list" ref={list}>
             {r.sameTicker.map((c, i) => {
               const me = c.mint === coin.mint
               const ps = readPad(c.platformInfo)
               const padTone = ps.kind === 'impostor' ? 'bad' : ps.kind === 'verified' ? '' : 'mute'
               return (
-                <li key={c.mint} className={me ? 'me' : ''}>
+                <li key={c.mint} className={me ? 'me' : c.mint === r.original.mint ? 'orig' : c.createAt < r.original.createAt ? 'old' : ''}>
                   <button onClick={() => !me && onCheck(c.mint)} disabled={me}>
                     <span className="n mono">{i + 1}</span>
                     <span className="m mono">{short(c.mint, 4)}</span>
@@ -315,7 +322,13 @@ export function ResultCard({ r, onCheck }: { r: CheckResult; onCheck: (ca: strin
                     </span>
                     <span className="t mono">{dayMonth(c.createAt)}</span>
                     <span className="f mono">
-                      {i === 0 ? 'first' : me ? 'this' : `+${span(c.createAt - r.original.createAt)}`}
+                      {c.mint === r.original.mint
+                        ? 'first'
+                        : me
+                          ? 'this'
+                          : c.createAt < r.original.createAt
+                            ? 'older'
+                            : `+${span(c.createAt - r.original.createAt)}`}
                     </span>
                   </button>
                 </li>

@@ -12,8 +12,8 @@ import { PADS } from './lib/pads'
 import { DiffText } from './components/ResultCard'
 
 const VERDICTS = [
-  ['STAMPED', 'v-stamped', 'The first coin with its ticker on LaunchLab, launched through a pad config we’ve tied to that pad.'],
-  ['COPY', 'v-copy', 'An earlier LaunchLab coin already uses this ticker. The card links the original.'],
+  ['STAMPED', 'v-stamped', 'The first coin with its ticker on LaunchLab in 30 days, launched through a pad config we’ve tied to that pad.'],
+  ['COPY', 'v-copy', 'Another LaunchLab coin used this ticker shortly before it. The card links the original.'],
   ['LOOK-ALIKE', 'v-lookalike', 'The coin or its pad points to a domain or X account made to pass for a real pad, or runs on a config wearing a real pad’s name.'],
   ['UNKNOWN PAD', 'v-unknown', 'The first of its ticker, but launched through a pad we haven’t verified yet. Not bad by itself, just unproven.'],
 ] as const
@@ -53,7 +53,7 @@ function Docs() {
           </div>
           <div>
             <dt>Ticker</dt>
-            <dd>Every LaunchLab coin with the same ticker is pulled and sorted by launch time. The earliest one is the original.</dd>
+            <dd>Every LaunchLab coin with the same ticker is pulled and sorted by launch time. Coins less than 30 days apart form one run, and the first coin of the run is the original. A ticker nobody used for 30 days is free again, so an unrelated coin from last year doesn’t make yours a copy.</dd>
           </div>
         </dl>
 
@@ -78,7 +78,7 @@ function Docs() {
           {PADS.map((p) => (
             <li key={p.id}>
               <span>{p.name}</span>
-              <span className="mute">{p.domain}</span>
+              <span className="mute">{p.domain || 'no website'}</span>
               <span className="mute">{p.configs.length ? `${p.configs.length} config${p.configs.length > 1 ? 's' : ''}` : 'by domain'}</span>
             </li>
           ))}
