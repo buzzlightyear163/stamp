@@ -75,7 +75,7 @@ function Checks({ r }: { r: CheckResult }) {
   const { pad } = r
   const padCheck: [Tone, string, string] =
     pad.kind === 'verified'
-      ? ['ok', pad.name, 'Own config']
+      ? ['ok', pad.name, 'Verified pad']
       : pad.kind === 'impostor'
         ? ['bad', pad.name, `Not ${pad.pad.name}’s config`]
         : pad.kind === 'unverified'
@@ -91,7 +91,9 @@ function Checks({ r }: { r: CheckResult }) {
         ? ['bad', r.coinDomain!, `Points to ${r.domainOtherPad?.name}`]
         : r.domainMatch === 'own'
           ? ['mute', r.coinDomain!, 'Coin’s own site']
-          : ['mute', '—', 'No website']
+          : pad.kind === 'verified' && pad.domain
+            ? ['ok', pad.domain, 'Verified pad’s site']
+            : ['mute', '—', 'No website']
 
   const n = r.runLength
   const last = r.older[r.older.length - 1]
@@ -236,7 +238,7 @@ export function ResultCard({ r, onCheck }: { r: CheckResult; onCheck: (ca: strin
       <div className="card-body">
         <dl className="rows">
           <Row k="Platform">
-            {platform.name || 'Unnamed pad'}{' '}
+            {(r.pad.kind === 'verified' ? r.pad.name : platform.name) || 'Unnamed pad'}{' '}
             {r.pad.kind === 'verified' ? (
               <Tag tone="ok">Verified</Tag>
             ) : r.pad.kind === 'impostor' ? (
@@ -248,7 +250,9 @@ export function ResultCard({ r, onCheck }: { r: CheckResult; onCheck: (ca: strin
           <Row k="Platform address">
             <Addr a={platform.pubKey} />
           </Row>
-          <Row k="Registered domain">{r.regDomain ?? <span className="mute">— none set</span>}</Row>
+          <Row k="Pad domain">
+            {r.regDomain || (r.pad.kind === 'verified' && r.pad.domain) || <span className="mute">— none set</span>}
+          </Row>
           <Row k="Coin’s domain">{r.coinDomain ?? <span className="mute">—</span>}</Row>
           <Row k={`First ${tick}`}>
             {r.position === 1 ? (
@@ -317,7 +321,7 @@ export function ResultCard({ r, onCheck }: { r: CheckResult; onCheck: (ca: strin
                     <span className="n mono">{i + 1}</span>
                     <span className="m mono">{short(c.mint, 4)}</span>
                     <span className={`p ${padTone}`}>
-                      {c.platformInfo.name || '—'}
+                      {(ps.kind === 'verified' ? ps.name : c.platformInfo.name) || '—'}
                       {ps.kind === 'impostor' && ' ✗'}
                     </span>
                     <span className="t mono">{dayMonth(c.createAt)}</span>

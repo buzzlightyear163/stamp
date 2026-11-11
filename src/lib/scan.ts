@@ -45,6 +45,12 @@ const NOISE = /^(TEST\d*|TESTING|TOKEN|COIN|\$?)$/
 // Names pads get when nobody bothered to name them.
 const GENERIC = /^(|my launch platform|launchpad|config|platform|fair launch|test.*)$/i
 
+/** A verified pad goes by its known name, everything else by its on-chain one. */
+const padLabel = (p: PlatformInfo, listed: PlatformInfo[]) => {
+  const ps = readPad(p, listed)
+  return ps.kind === 'verified' ? ps.name : p.name
+}
+
 async function inBatches<T, R>(items: T[], size: number, fn: (t: T) => Promise<R>) {
   const out: R[] = []
   for (let i = 0; i < items.length; i += size) out.push(...(await Promise.all(items.slice(i, i + size).map(fn))))
@@ -123,12 +129,12 @@ export async function scan24h({ searchLimit = 40, maxPages = 40, onProgress }: S
         symbol: c.symbol,
         name: c.name,
         createAt: c.createAt,
-        pad: c.platformInfo.name,
+        pad: padLabel(c.platformInfo, listed),
         impostor: readPad(c.platformInfo, listed).kind === 'impostor',
         kind: 'COPY',
         originalMint: original.mint,
         originalAt: original.createAt,
-        originalPad: original.platformInfo.name,
+        originalPad: padLabel(original.platformInfo, listed),
       })
     }
   }

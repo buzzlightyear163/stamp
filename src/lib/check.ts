@@ -182,8 +182,8 @@ export async function check(ca: string, onStep?: (s: string) => void): Promise<C
   } else {
     verdict = 'STAMPED'
     headline = older.length
-      ? `The first ${tick} on LaunchLab in 30 days, launched through ${pad.name}’s own config.`
-      : `The first ${tick} on LaunchLab, launched through ${pad.name}’s own config.`
+      ? `The first ${tick} on LaunchLab in 30 days, launched through ${pad.name}, a verified pad.`
+      : `The first ${tick} on LaunchLab, launched through ${pad.name}, a verified pad.`
   }
 
   return {

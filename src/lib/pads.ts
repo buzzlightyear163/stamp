@@ -125,12 +125,11 @@ export const PADS: Pad[] = [
     ],
   },
   {
-    // STAMP's own pad. Its on-chain name is LaunchLab's default, so the name alone proves nothing.
     id: 'stamp',
-    name: 'My Launch Platform',
-    domain: '',
+    name: 'STAMP',
+    domain: 'stampcheck.fun',
+    img: 'https://www.stampcheck.fun/favicon.svg',
     configs: ['D2ySdMncomHKRKBV4AAftqnLKxyS6HMWcmbewvNcawCg'],
-    matchName: false,
   },
   { id: 'peak', name: 'Peak', domain: 'launchonpeak.fun', configs: [] },
   { id: 'curvd', name: 'Curvd', domain: 'curvd.fun', configs: [] },
