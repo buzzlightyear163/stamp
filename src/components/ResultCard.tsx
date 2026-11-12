@@ -97,8 +97,13 @@ function Checks({ r }: { r: CheckResult }) {
 
   const n = r.runLength
   const last = r.older[r.older.length - 1]
-  const tickerCheck: [Tone, string, string] =
-    r.position === 1
+  const tickerCheck: [Tone, string, string] = r.relaunch
+    ? [
+        'ok',
+        'Relaunch',
+        `${r.original.creator === r.coin.creator ? 'Same creator wallet' : 'Same team'} as the first, ${span(r.coin.createAt - r.original.createAt)} earlier`,
+      ]
+    : r.position === 1
       ? last
         ? ['ok', 'First in 30 days', `Last used ${span(r.coin.createAt - last.createAt)} earlier`]
         : ['ok', `1st of ${n}${r.capped ? '+' : ''}`, n > 1 ? `${n - 1} came after` : 'No other coins']
@@ -255,7 +260,15 @@ export function ResultCard({ r, onCheck }: { r: CheckResult; onCheck: (ca: strin
           </Row>
           <Row k="Coin’s domain">{r.coinDomain ?? <span className="mute">—</span>}</Row>
           <Row k={`First ${tick}`}>
-            {r.position === 1 ? (
+            {r.relaunch ? (
+              <span className="addr">
+                <span className="ok">relaunch of</span>
+                <button className="linkish" onClick={() => onCheck(r.original.mint)}>
+                  {short(r.original.mint, 6)}
+                </button>
+                <span className="mute">{stamp(r.original.createAt)}</span>
+              </span>
+            ) : r.position === 1 ? (
               <span className="ok">
                 this coin · {stamp(coin.createAt)}
                 {r.older.length > 0 && <span className="mute"> · older ones are 30+ days earlier</span>}

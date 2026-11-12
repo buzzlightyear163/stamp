@@ -136,6 +136,15 @@ export const PADS: Pad[] = [
   { id: 'stoke', name: 'Stoke', domain: 'usestoke.xyz', configs: [] },
 ]
 
+/**
+ * Coins that replace an earlier coin from the same team: the earlier mint is
+ * not "the original" of a copy, it's the same project launched again.
+ */
+export const RELAUNCHES: Record<string, string[]> = {
+  // $STAMP relaunch, replaces the first $STAMP from 11 Nov 2026
+  Fg12Qq2sY2xAoeg9t26WN2mcJ2bVaT2EPQXKp7eL6bns: ['FyHoVLRdnRawp5kPckJTMRwPqjCmSXx7px39R5yRw5Ac'],
+}
+
 export const padByConfig = (pubKey: string) => PADS.find((p) => p.configs.includes(pubKey))
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')

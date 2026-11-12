@@ -1,5 +1,5 @@
 import { newestPage, raydiumListedPlatforms, searchTicker, type LaunchCoin, type PlatformInfo } from './api.js'
-import { findLookalikes, readPad, runOf } from './check.js'
+import { findLookalikes, isRelaunch, readPad, runOf } from './check.js'
 import { baseDomain, hostOf } from './domains.js'
 import { PADS } from './pads.js'
 
@@ -123,7 +123,7 @@ export async function scan24h({ searchLimit = 40, maxPages = 40, onProgress }: S
     for (const c of g) {
       // A copy only if the ticker was used in the 30 days before it (see runOf).
       const { original, position } = runOf(sorted, c.mint)
-      if (position === 1 || caught.has(c.mint)) continue
+      if (position === 1 || caught.has(c.mint) || isRelaunch(c, original)) continue
       caught.set(c.mint, {
         mint: c.mint,
         symbol: c.symbol,

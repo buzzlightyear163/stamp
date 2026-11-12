@@ -7,7 +7,7 @@ import {
   isLookalikeHandle,
   xHandleOf,
 } from './domains.js'
-import { PADS, padByConfig, padByDomain, padByName, type Pad } from './pads.js'
+import { PADS, RELAUNCHES, padByConfig, padByDomain, padByName, type Pad } from './pads.js'
 import { ordinal, span } from './format.js'
 
 export type Verdict = 'STAMPED' | 'COPY' | 'LOOKALIKE' | 'UNKNOWN'
@@ -46,6 +46,8 @@ export interface CheckResult {
   runLength: number
   /** Same-ticker coins from before this run, more than 30 days before it. */
   older: LaunchCoin[]
+  /** Same team launched this ticker again: not a copy. */
+  relaunch: boolean
   capped: boolean
   graduated: boolean
 }
@@ -60,6 +62,15 @@ export const COPY_WINDOW = 30 * 24 * 3600 * 1000
  * ticker sat unused for longer than COPY_WINDOW. Coins in a run after its first
  * one are copies of it; an unrelated coin from a year ago doesn't make yours one.
  */
+/**
+ * A coin that follows its own team's earlier coin is a relaunch, not a copy:
+ * the run was started by the same creator wallet, or by a mint this coin
+ * is declared to replace.
+ */
+export const isRelaunch = (coin: LaunchCoin, original: LaunchCoin) =>
+  coin.mint !== original.mint &&
+  (original.creator === coin.creator || (RELAUNCHES[coin.mint] ?? []).includes(original.mint))
+
 export function runOf(sorted: LaunchCoin[], mint: string) {
   let start = 0
   for (let i = 0; i < sorted.length; i++) {
@@ -138,6 +149,7 @@ export async function check(ca: string, onStep?: (s: string) => void): Promise<C
   if (!same.some((r) => r.mint === coin.mint)) same.push(coin)
   same.sort((a, b) => a.createAt - b.createAt)
   const { original, position, older, run } = runOf(same, coin.mint)
+  const relaunch = isRelaunch(coin, original)
 
   onStep?.('Comparing pad and domains')
   const platform = coin.platformInfo
@@ -166,7 +178,7 @@ export async function check(ca: string, onStep?: (s: string) => void): Promise<C
     else if (pad.kind === 'impostor')
       headline = `Launched through a config named ${pad.name} that isn’t ${pad.pad.name}’s.`
     else headline = `Uses ${lookalikes[0].fake}, made to pass for ${lookalikes[0].real}.`
-  } else if (position > 1) {
+  } else if (position > 1 && !relaunch) {
     verdict = 'COPY'
     const gap = span(coin.createAt - original.createAt)
     headline = `The ${ordinal(position)} ${tick} on LaunchLab. The original launched ${gap} earlier${
@@ -181,7 +193,9 @@ export async function check(ca: string, onStep?: (s: string) => void): Promise<C
         : `${first}, launched through a pad we haven’t verified yet.`
   } else {
     verdict = 'STAMPED'
-    headline = older.length
+    headline = relaunch
+      ? `A relaunch of ${tick} by the team behind the first one, launched through ${pad.name}, a verified pad.`
+      : older.length
       ? `The first ${tick} on LaunchLab in 30 days, launched through ${pad.name}, a verified pad.`
       : `The first ${tick} on LaunchLab, launched through ${pad.name}, a verified pad.`
   }
@@ -202,6 +216,7 @@ export async function check(ca: string, onStep?: (s: string) => void): Promise<C
     position,
     runLength: run.length,
     older,
+    relaunch,
     capped: rows.length >= 100,
     graduated: coin.finishingRate >= 100 || !!coin.migrateAmmId,
   }
